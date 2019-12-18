@@ -1,0 +1,17 @@
+{
+  "name": "geoelevations",
+  "version": "1.0.0",
+  "description": "service to return elevations from Digital Elevation Model (DEM) raster files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-runtime": "^6.26.0",
+    "express": "^4.17.1",
+    "geotiff": "^1.0.0-beta.6",
+    "nodemon": "^2.0.2"
+  }
+}
