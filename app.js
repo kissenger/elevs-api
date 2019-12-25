@@ -132,15 +132,15 @@ function getElevation(pX, pY, image) {
 }
 
 
-function loadImage(fName) {
-  return new Promise( (res, rej) => {
-    GeoTIFF.fromFile('./tiff/' + fileName).  then( (tiff) => {
-      tiff.getImage().then( (image) => {
-        return image
-      });
-    });
-  });
-}
+// function loadImage(fName) {
+//   return new Promise( (res, rej) => {
+//     GeoTIFF.fromFile('./tiff/' + fileName).  then( (tiff) => {
+//       tiff.getImage().then( (image) => {
+//         return image
+//       });
+//     });
+//   });
+// }
 
 
 /**
