@@ -7,25 +7,30 @@ app.use(bodyParser.json());
 
 app.post('/ts-elevs-api/', (req, res) => {
 
-  // preprocess the request - returns an array containing {pixelX, pixelY, fileName} for each request point
-  dataArray = preProcess(req.body.coordsArray);
-
-  // with preprocessed data, get an array containing only the specific unique images required
-  // this avoids loading the images more times than is necessary
-  let fileNames = objArray.map(data => data.fileName);
-  let uniqueFileNames = [...new Set(fileNames)];
-  uniqueImages = loadImages(uniqueFileNames);
-
-  // request elevations from the open images
-  const promises = req.body.coordsArray.map(point => {
-    let img = uniqueImages(uniqueFileNames.indexOf(point.fileName));
-    getElevation(point.pixelX, point.pixelY, img);
-  });
+  // preprocess the request - works out for every point which file (tile) to request, and the specific pixel needed
+  // returns an array containing {pixelX, pixelY, fileName} for each request point
   
-  Promise.all(promises).then( (result) => {
-    res.status(201).json( {result} );
-  });
+  console.log('start' + timeStamp());
+  preProcess(req.body.coordsArray).then( (dataArray) => {
 
+    // with preprocessed data, get an array containing only the specific unique images required
+    // this avoids loading the images more times than is necessary
+    let fileNames = dataArray.map(data => data.fileName);
+    let uniqueFileNames = [...new Set(fileNames)];
+    loadImages(uniqueFileNames).then( (uniqueImages) => {
+
+      // request elevations from the open images
+      const promises = dataArray.map(point => 
+        getElevation(point.pixelX, point.pixelY, uniqueImages[uniqueFileNames.indexOf(point.fileName)])
+      );
+      
+      Promise.all(promises).then( (result) => {
+        console.log('end' + timeStamp());
+        res.status(201).json( {result} );
+      });
+
+    });
+  });
 });
 
 /**
@@ -36,7 +41,7 @@ function loadImages(fNames) {
   
   return new Promise( (res, rej) => {
 
-    const imgPromises = fNames.map( (file) => {
+    const imgPromises = fNames.map( (fileName) => {
       return new Promise( (rs, rj) => {
         GeoTIFF.fromFile('./tiff/' + fileName).then( (tiff) => {
           tiff.getImage().then( (image) => {
@@ -46,7 +51,9 @@ function loadImages(fNames) {
       }); 
     });
 
-    promise.all(imgPromises).then( (result) => {
+    Promise.all(imgPromises).then( (result) => {
+      
+      console.log('load' + timeStamp());
       res(result);
     })
   });
@@ -59,74 +66,82 @@ function loadImages(fNames) {
  * @param {*} p point as {lat: number, lng: number}
  */
 function preProcess(points) {
-
-  return new Promise( (res, rej) => {
+  
+  return new Promise( (resOuter, rejOuter) => {
 
     const numberOfPixelsPerDegree = 3600;
     const pixelWidth = 1 / numberOfPixelsPerDegree;
     const offset = pixelWidth / 2;
-    const data = [];
 
-    points.forEach( (point) => {
+    prePromises = points.map( (point) => {
 
-      // calculate the origin of the dem tile, this will be the mid-point of the lower left pixel, in lng/lat
-      // https://lpdaac.usgs.gov/documents/434/ASTGTM_User_Guide_V3.pdf
-      const tileOriginLng = point.lng < 0 ? Math.trunc(p.lng - 1) : Math.trunc(p.lng);
-      const tileOriginLat = point.lat < 0 ? Math.trunc(p.lat - 1) : Math.trunc(p.lat);
+      return new Promise( (resInner, rejInner) => {
 
-      // calculate the origin of the tif, being the upper left corner of the upper left pixel, in lng/lat
-      // http://docs.opengeospatial.org/is/19-008r4/19-008r4.html#_pixelisarea_raster_space
-      const tiffOriginLng = tileOriginLng - offset;     
-      const tiffOriginLat = tileOriginLat + 1 + offset;
+        // calculate the origin of the dem tile, this will be the mid-point of the lower left pixel, in lng/lat
+        // https://lpdaac.usgs.gov/documents/434/ASTGTM_User_Guide_V3.pdf
+        const tileOriginLng = point.lng < 0 ? Math.trunc(point.lng - 1) : Math.trunc(point.lng);
+        const tileOriginLat = point.lat < 0 ? Math.trunc(point.lat - 1) : Math.trunc(point.lat);
 
-      // determine the lng/lat offsets of the point of interest from the tiff origin
-      // offset the values by 'offset' (half pixel width) to ensure we find the upper left
-      // pixel of the group of 4 boxes that will be interpolated over
-      let dLng = options.interpolate ?  p.lng - tiffOriginLng - offset : p.lng - tiffOriginLng;
-      let dLat = tiffOriginLat - p.lat;
+        // calculate the origin of the tif, being the upper left corner of the upper left pixel, in lng/lat
+        // http://docs.opengeospatial.org/is/19-008r4/19-008r4.html#_pixelisarea_raster_space
+        const tiffOriginLng = tileOriginLng - offset;     
+        const tiffOriginLat = tileOriginLat + 1 + offset;
 
-      // convert to pixel x and y coordinates
-      // this is the coordinate of the upper left pixel in the group of four 
-      const pixelX = Math.trunc(dLng/pixelWidth);
-      const pixelY = Math.trunc(dLat/pixelWidth);
+        // determine the lng/lat offsets of the point of interest from the tiff origin
+        // offset the values by 'offset' (half pixel width) to ensure we find the upper left
+        // pixel of the group of 4 boxes that will be interpolated over
+        let dLng = point.lng - tiffOriginLng;
+        let dLat = tiffOriginLat - point.lat;
 
-      // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
-      // const boxOriginX = pixelX * pixelWidth + tileOriginLng;
-      // const boxOriginY = 1 - pixelY * pixelWidth + tileOriginLat;
-      // const x0 = (p.lng - boxOriginX) / pixelWidth;
-      // const y0 = (p.lat - boxOriginY) / pixelWidth;
+        // convert to pixel x and y coordinates
+        // this is the coordinate of the upper left pixel in the group of four 
+        const pixelX = Math.trunc(dLng/pixelWidth);
+        const pixelY = Math.trunc(dLat/pixelWidth);
 
-      const fName = getFileName(tileOriginLng, tileOriginLat);
-      data.push({pixelX: pixelX, pixelY: pixelY, fileName: fName});
-      
-
+        // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
+        // const boxOriginX = pixelX * pixelWidth + tileOriginLng;
+        // const boxOriginY = 1 - pixelY * pixelWidth + tileOriginLat;
+        // const x0 = (p.lng - boxOriginX) / pixelWidth;
+        // const y0 = (p.lat - boxOriginY) / pixelWidth;
+        const fName = getFileName(tileOriginLng, tileOriginLat);
+        resInner({pixelX: pixelX, pixelY: pixelY, fileName: fName});
+        
+      });
     });
 
-    res(data);
-  
-  });
+    Promise.all(prePromises).then( (result) => { 
+      
+      console.log('pre' + timeStamp());
+      resOuter(result); 
+    });
+  })
 }
 
 function getElevation(pX, pY, image) {
 
+  return new Promise ( (res, rej) => {
 
-  image.readRasters({ window: [pX, pY, pX + shift, pY + shift] }).then( (result) => {
+    const shift = 1;
+    image.readRasters({ window: [pX, pY, pX + shift, pY + shift] }).then( (result) => {
 
-    // if (opt.verbose) {
-    //   info = {
-    //     "interpolate": opt.interp,
-    //     "raw": elevs,
-    //     "bbox": image.getBoundingBox(),
-    //     "pixels": [pX, pY, pX + shift-1, pY + shift-1] }
-    // };
-    
-    // console.log(elev);
-    // console.log(p);
-    // console.log(fileName);
-    // console.log(pixelX, pixelY);
-    // console.log(image.getBoundingBox());
 
-    res({...result});
+      // if (opt.verbose) {
+      //   info = {
+      //     "interpolate": opt.interp,
+      //     "raw": elevs,
+      //     "bbox": image.getBoundingBox(),
+      //     "pixels": [pX, pY, pX + shift-1, pY + shift-1] }
+      // };
+      
+      // console.log(elev);
+      // console.log(p);
+      // console.log(fileName);
+      // console.log(pixelX, pixelY);
+      // console.log(image.getBoundingBox());
+        console.log('getElevations' + timeStamp());
+
+      res(result[0][0]);
+    })
             
   })     
 }
