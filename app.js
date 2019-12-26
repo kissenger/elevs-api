@@ -15,18 +15,27 @@ app.post('/ts-elevs-api/', (req, res) => {
 
     // with preprocessed data, get an array containing only the specific unique images required
     // this avoids loading the images more times than is necessary
-    let fileNames = dataArray.map(data => data.fileName);
+    let fileNames = dataArray.map(data => { return {fileName: data.fileName}; });
     let uniqueFileNames = [...new Set(fileNames)];
+    let uniquePoints = [...new Set(dataArray)];
+
     loadImages(uniqueFileNames).then( (uniqueImages) => {
 
-      // request elevations from the open images
-      const promises = dataArray.map(point => 
+      // request elevations for the unique points
+      const promises = uniquePoints.map(point => 
         getElevation(point.pixelX, point.pixelY, uniqueImages[uniqueFileNames.indexOf(point.fileName)])
       );
       
-      Promise.all(promises).then( (result) => {
-        console.log('end' + timeStamp());
-        res.status(201).json( {result} );
+      Promise.all(promises).then( (uniqueResults) => {
+        // map unique results back into request array
+        
+        dataArray.forEach( (point) => {
+          point
+        })
+
+
+
+        res.status(201).json( {unique} );
       });
 
     });
