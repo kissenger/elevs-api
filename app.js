@@ -10,13 +10,15 @@ const DEBUG = true;
 app.use(bodyParser.json());
 
 app.post('/ts-elevs-api/', (req, res) => {
+  // benchmark about 7 secs for 400 points
+  console.log(timeStamp() + ': start');
 
   // print to console for debugging 
-  if (DEBUG) { console.log(' >> ts-elevation-api > POST'); }
 
   const promises = req.body.coordsArray.map(point => getElevation(point, req.body.options));
   Promise.all(promises).then( (result) => {
     res.status(201).json( {result} );
+    console.log(timeStamp() + ': end');
   });
 
 });
