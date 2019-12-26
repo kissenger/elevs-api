@@ -10,19 +10,19 @@ app.post('/ts-elevs-api/', (req, res) => {
   // preprocess the request - works out for every point which file (tile) to request, and the specific pixel needed
   // returns an array containing {pixelX, pixelY, fileName} for each request point
   
-  console.log('start' + timeStamp());
+  console.log(timeStamp() + ': start');
   preProcess(req.body.coordsArray).then( (dataArray) => {
 
     // with preprocessed data, get an array containing only the specific unique images required
     // this avoids loading the images more times than is necessary
-    let fileNames = dataArray.map(data => data.fileName );
-    let uniqueFileNames = [...new Set(fileNames)];
-    let uniquePoints = [...new Set(dataArray)];
+    let uniqueFileNames = [...new Set(dataArray.map(data => data.fileName ))];
+    let uniquePoints = [...new Set(dataArray.map(JSON.stringify))].map(JSON.parse);
 
     loadImages(uniqueFileNames).then( (uniqueImages) => {
-
+      // console.log(uniquePoints);
       // request elevations for the unique points
       const promises = uniquePoints.map(uniquePoint => 
+        
         getElevation(uniquePoint, uniqueImages[uniqueFileNames.indexOf(uniquePoint.fileName)])
       );
       
@@ -42,7 +42,7 @@ app.post('/ts-elevs-api/', (req, res) => {
 
         Promise.all(resPromises).then( (returnResult) => {
           res.status(201).json( {returnResult} );
-          console.log('end' + timeStamp());
+          console.log(timeStamp() + ': end');
         });        
       });
 
@@ -70,7 +70,7 @@ function loadImages(fNames) {
 
     Promise.all(imgPromises).then( (result) => {
       
-      console.log('load' + timeStamp());
+      console.log(timeStamp() + ': load finished');
       res(result);
     })
   });
@@ -121,14 +121,14 @@ function preProcess(points) {
         // const x0 = (p.lng - boxOriginX) / pixelWidth;
         // const y0 = (p.lat - boxOriginY) / pixelWidth;
         const fName = getFileName(tileOriginLng, tileOriginLat);
-        resInner({lng: point.lng, lat: point.lat, pixelX: pixelX, pixelY: pixelY, fileName: fName});
-        
+        // resInner({lng: point.lng, lat: point.lat, pixelX: pixelX, pixelY: pixelY, fileName: fName});
+        resInner({pixelX: pixelX, pixelY: pixelY, fileName: fName});
       });
     });
 
     Promise.all(prePromises).then( (result) => { 
       
-      console.log('pre' + timeStamp());
+      console.log(timeStamp() + ': pre finished');
       resOuter(result); 
     });
   })
@@ -158,6 +158,7 @@ function getElevation(point, image) {
 //         console.log('getElevations' + timeStamp());
 //         console.log(result[0]);
 // console.log({point: point, elev: result[0][0]});
+      // console.log(timeStamp() + ': elevation finished');
       res({point: point, elev: result[0][0]});
     })
             
