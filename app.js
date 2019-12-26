@@ -15,27 +15,35 @@ app.post('/ts-elevs-api/', (req, res) => {
 
     // with preprocessed data, get an array containing only the specific unique images required
     // this avoids loading the images more times than is necessary
-    let fileNames = dataArray.map(data => { return {fileName: data.fileName}; });
+    let fileNames = dataArray.map(data => data.fileName );
     let uniqueFileNames = [...new Set(fileNames)];
     let uniquePoints = [...new Set(dataArray)];
 
     loadImages(uniqueFileNames).then( (uniqueImages) => {
 
       // request elevations for the unique points
-      const promises = uniquePoints.map(point => 
-        getElevation(point.pixelX, point.pixelY, uniqueImages[uniqueFileNames.indexOf(point.fileName)])
+      const promises = uniquePoints.map(uniquePoint => 
+        getElevation(uniquePoint, uniqueImages[uniqueFileNames.indexOf(uniquePoint.fileName)])
       );
       
       Promise.all(promises).then( (uniqueResults) => {
         // map unique results back into request array
         
-        dataArray.forEach( (point) => {
-          point
+        const resPromises = dataArray.map( (pt) => {
+          return new Promise( (res, rej) => {
+            uniqueResults.forEach( (uniqueResult) => {
+              if (pt = uniqueResult.point) { 
+                // console.log(pt, uniqueResult.elev);
+                res({lat: pt.lat, lng: pt.lng, elev: uniqueResult.elev});
+              }
+            })
+          })
         })
 
-
-
-        res.status(201).json( {unique} );
+        Promise.all(resPromises).then( (returnResult) => {
+          res.status(201).json( {returnResult} );
+          console.log('end' + timeStamp());
+        });        
       });
 
     });
@@ -113,7 +121,7 @@ function preProcess(points) {
         // const x0 = (p.lng - boxOriginX) / pixelWidth;
         // const y0 = (p.lat - boxOriginY) / pixelWidth;
         const fName = getFileName(tileOriginLng, tileOriginLat);
-        resInner({pixelX: pixelX, pixelY: pixelY, fileName: fName});
+        resInner({lng: point.lng, lat: point.lat, pixelX: pixelX, pixelY: pixelY, fileName: fName});
         
       });
     });
@@ -126,12 +134,12 @@ function preProcess(points) {
   })
 }
 
-function getElevation(pX, pY, image) {
+function getElevation(point, image) {
 
   return new Promise ( (res, rej) => {
 
     const shift = 1;
-    image.readRasters({ window: [pX, pY, pX + shift, pY + shift] }).then( (result) => {
+    image.readRasters({ window: [point.pixelX, point.pixelY, point.pixelX + shift, point.pixelY + shift] }).then( (result) => {
 
 
       // if (opt.verbose) {
@@ -147,9 +155,10 @@ function getElevation(pX, pY, image) {
       // console.log(fileName);
       // console.log(pixelX, pixelY);
       // console.log(image.getBoundingBox());
-        console.log('getElevations' + timeStamp());
-
-      res(result[0][0]);
+//         console.log('getElevations' + timeStamp());
+//         console.log(result[0]);
+// console.log({point: point, elev: result[0][0]});
+      res({point: point, elev: result[0][0]});
     })
             
   })     
