@@ -11,37 +11,37 @@ app.post('/ts-elevs-api/', (req, res) => {
   // returns an array containing {pixelX, pixelY, fileName} for each request point
   
   console.log(timeStamp() + ': start');
-  // preProcess(req.body.coordsArray).then( (preArray) => {
-  let pre = preProcess(req.body.coordsArray);
+  
+  preProcess(req.body.coordsArray).then(pre=> {
   // console.log(pre);
-
-    // an array of both unique file names and unqiue points is needed to ensure that 
-    // correct images are loaded only once, and correct pixels are only polled once
-    let uniqueFileNames = [...new Set(pre.out.map(data => data.fileName ))];
-    // let uniquePoints = [...new Set(preArray.map(JSON.stringify))].map(JSON.parse);
-
-
-
-    loadImages(uniqueFileNames).then( (uniqueImages) => {
-    // uniqueImages = loadImages(uniqueFileNames);
       
-      const promises = pre.uniquePoints.map(uniquePoint => 
-        getElevation(uniquePoint, uniqueImages[uniqueFileNames.indexOf(uniquePoint.fileName)])
-      );
+      const promises = pre.data.map( (point) => {
+        return new Promise( (res, rej) => {
+          if ( point.isPointAsLast ) { 
+            res(-999); 
+          } else { 
+            // console.log(pre.fNames.indexOf(point.fileName));
+            // console.log(pre.fNames);
+            getElevation(point, pre.images[pre.fNames.indexOf(point.fileName)]).then( (elev) => {
+              res(elev);
+            })
+          }
 
-      Promise.all(promises).then( (uniqueResults) => {        
-
-        returnResult = pre.out.map( (point) => {
-          return {lng: point.lng, lat: point.lat, elev: uniqueResults[point.uniquePointRef]};
+            
         })
+      
+      })
 
-        res.status(200).json( {returnResult} );
+      Promise.all(promises).then( (result) => {        
+
+        res.status(200).json(result);
         console.log(timeStamp() + ': end');
         // loop through requested points and find the elevation for the point
 
       });
 
     });
+  
   });
 // });
 
@@ -49,25 +49,15 @@ app.post('/ts-elevs-api/', (req, res) => {
  * Returns an array containing image objects correcponding to the filenames provided in the argument
  * @param {*} fNames array of file names for which to return images 
  */
-function loadImages(fNames) {
+function getImage(fn) {
   
-  return new Promise( (res, rej) => {
-    const imgPromises = fNames.map( fName => {
-      return new Promise( (rs, rj) => {
-        GeoTIFF.fromFile('./tiff/' + fName).then( (tiff) => 
-          tiff.getImage().then( (img) => rs(img) )
-        );
-      });
-    });        
-
-    Promise.all(imgPromises).then( (result) => {
-      console.log(timeStamp() + ': load finished');
-      res(result);
-    })
+  return new Promise( (rs, rj) => {
+    GeoTIFF.fromFile('./tiff/' + fn).then( (tiff) => 
+      tiff.getImage().then( (img) => rs(img) )
+    );
   });
+    
 }
-
-
 
 /**
  * return an array of [coord, pixX, pixY, fileName]
@@ -75,17 +65,18 @@ function loadImages(fNames) {
  */
 function preProcess(points) {
   
-  // return new Promise( (resOuter, rejOuter) => {
+  return new Promise( (res, rej) => {
 
     // prepare calculation parameters
     const numberOfPixelsPerDegree = 3600;
     const pixelWidth = 1 / numberOfPixelsPerDegree;
     const offset = pixelWidth / 2;
+    const data = [];
+    const fNames = [];
+    let isImageAsLast = false;
+    let isPointAsLast = false; 
 
-    // prepare result arrays
-    const uPoints = [];
-    const ufNames = [];
-    const preArr = [];
+
 
     // loop through each point, determine which pixel is reqd from which image
     points.forEach( (point, ipoint) => {
@@ -111,39 +102,43 @@ function preProcess(points) {
 
         // convert to pixel x and y coordinates
         // this is the coordinate of the upper left pixel in the group of four 
-        const pixelX = Math.trunc(dLng/pixelWidth);
-        const pixelY = Math.trunc(dLat/pixelWidth);
+        const pX = Math.trunc(dLng/pixelWidth);
+        const pY = Math.trunc(dLat/pixelWidth);
 
         // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
         // const boxOriginX = pixelX * pixelWidth + tileOriginLng;
         // const boxOriginY = 1 - pixelY * pixelWidth + tileOriginLat;
         // const x0 = (p.lng - boxOriginX) / pixelWidth;
         // const y0 = (p.lat - boxOriginY) / pixelWidth;
-        const fName = getFileName(tileOriginLng, tileOriginLat);
-        // resInner({lng: point.lng, lat: point.lat, pixelX: pixelX, pixelY: pixelY, fileName: fName});
-        //   resInner({pixelX: pixelX, pixelY: pixelY, fileName: fName});
 
-        // determine if the resulting pixel coordinates and filename are unique
-        let resultString = JSON.stringify({pixelX: pixelX, pixelY: pixelY, fileName: fName});
-        // console.log(resultString);
-        let index = uPoints.indexOf(resultString);
-        if (index < 0) {
-          uPoints.push(resultString);
-          index = ipoint;
+        const fName = getFileName(tileOriginLng, tileOriginLat);
+        const uniqueId = pX.toString() + pY.toString() + fName;
+        if ( data.length !== 0 ) {
+          isImageAsLast = fName === data[data.length - 1].fileName;
+          isPointAsLast = uniqueId === data[data.length - 1].uniqueId;
         }
-        if (!ufNames.includes(fName)) { ufNames.push(fName); }
-        
-        preArr.push( {lat: point.lat, lng: point.lng, pixelX: pixelX, pixelY: pixelY, fileName: fName, uniquePointRef: index} );
+        if (!fNames.includes(fName)) { fNames.push(fName); }
+ 
+        data.push( {
+          lat: point.lat, 
+          lng: point.lng, 
+          pixelX: pX, 
+          pixelY: pY, 
+          fileName: fName,
+          uniqueId, 
+          isImageAsLast, 
+          isPointAsLast
+        } );
+
       // });
     });
 
-    // Promise.all(prePromises).then( (result) => { 
-      
+    promises = fNames.map( fName => getImage(fName) );
+    Promise.all(promises).then( (images) => {
       console.log(timeStamp() + ': pre finished');
-      // console.log(uPoints);
-      return {out: preArr, uniquePoints: uPoints.map(JSON.parse)};
-      // resOuter(result); 
-    // });
+      res( {data, fNames, images});
+    });
+  });
   // })
 }
 
@@ -151,28 +146,11 @@ function getElevation(point, image) {
 
   return new Promise ( (res, rej) => {
 
-    // console.log(image, point);
+    // console.log('10');
+    // console.log(point);
+
     const shift = 1;
     image.readRasters({ window: [point.pixelX, point.pixelY, point.pixelX + shift, point.pixelY + shift] }).then( (result) => {
-
-
-      // if (opt.verbose) {
-      //   info = {
-      //     "interpolate": opt.interp,
-      //     "raw": elevs,
-      //     "bbox": image.getBoundingBox(),
-      //     "pixels": [pX, pY, pX + shift-1, pY + shift-1] }
-      // };
-      
-      // console.log(elev);
-      // console.log(p);
-      // console.log(fileName);
-      // console.log(pixelX, pixelY);
-      // console.log(image.getBoundingBox());
-//         console.log('getElevations' + timeStamp());
-//         console.log(result[0]);
-// console.log({point: point, elev: result[0][0]});
-      // console.log(timeStamp() + ': elevation finished');
       res(result[0][0]);
     })
             
