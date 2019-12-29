@@ -1,8 +1,8 @@
 const express = require('express');
 const app = express();
+const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/geotiff.js/
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
-const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/geotiff.js/
 
 // define global variables 
 // TODO: find a way to manage without global variables
@@ -30,7 +30,7 @@ app.post('/ts-elevs-api/', (req, res) => {
 
 /**
  * returns the elevation for desired lng/lat coordinate pair
- * @param {*} point desired point as {lat: number, lng: number}
+ * @param {*} point desired point as [lng, lat]
  */
 
 function getElevation(point) {
@@ -41,14 +41,14 @@ function getElevation(point) {
 
     // if elevation for the required pixel and image exist in the database, then return that
     if (id in database) { 
-      res( {lat: point.lat, lng: point.lng, elev: database[id]} ) 
+      res( {lat: point[1], lng: point[0], elev: database[id]} ) 
     
     // otherwise get the required elevation and store in the db in case needed in the future
     } else {
       getImage(pixel.fname).then( (image) => {
         readPixelValue(image, pixel.px, pixel.py).then( (elev) => {
           database[id] = elev;
-          res({lat: point.lat, lng: point.lng, elev: elev});
+          res({lat: point[1], lng: point[0], elev: elev});
         })
       })
     }
@@ -62,25 +62,25 @@ function getElevation(point) {
  */
 function getPixel(p) {
 
-  const numberOfPixelsPerDegree = 3600;
-  const pixelWidth = 1 / numberOfPixelsPerDegree;
-  const offset = pixelWidth / 2;
+  // const numberOfPixelsPerDegree = 3600;
+  // const pixelWidth = 1 / 3600;
+  const offset = 1 / 7200;
   
   // calculate the origin of the dem tile, this will be the mid-point of the lower left pixel, in lng/lat
   // https://lpdaac.usgs.gov/documents/434/ASTGTM_User_Guide_V3.pdf
-  const tileOriginLng = p.lng < 0 ? Math.trunc(p.lng - 1) : Math.trunc(p.lng);
-  const tileOriginLat = p.lat < 0 ? Math.trunc(p.lat - 1) : Math.trunc(p.lat);
+  const tileOriginLng = p[0] < 0 ? (p[0] - 1) << 0 : p[0] << 0;
+  const tileOriginLat = p[1] < 0 ? (p[1] - 1) << 0 : p[1] << 0;
 
   // calculate the origin of the tif, being the upper left corner of the upper left pixel, in lng/lat
   // http://docs.opengeospatial.org/is/19-008r4/19-008r4.html#_pixelisarea_raster_space
-  const tiffOriginLng = tileOriginLng - offset;     
+  const tiffOriginLng = tileOriginLng - (offset);     
   const tiffOriginLat = tileOriginLat + 1 + offset;
 
   // determine the lng/lat offsets of the point of interest from the tiff origin
   // offset the values by 'offset' (half pixel width) to ensure we find the upper left
   // pixel of the group of 4 boxes that will be interpolated over
-  let dLng = p.lng - tiffOriginLng;
-  let dLat = tiffOriginLat - p.lat;
+  const dLng = p[0] - tiffOriginLng;
+  const dLat = tiffOriginLat - p[1];
 
   // if (opt.interp) {
   //   dLng = dLng - offset;
@@ -89,8 +89,8 @@ function getPixel(p) {
 
   // convert to pixel x and y coordinates
   // this is the coordinate of the upper left pixel in the group of four 
-  const px = Math.trunc(dLng/pixelWidth);
-  const py = Math.trunc(dLat/pixelWidth);
+  const px = dLng * 3600 << 0;
+  const py = dLat * 3600 << 0;
 
   // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
   // const boxOriginX = pixelX * pixelWidth + tileOriginLng;
@@ -98,7 +98,6 @@ function getPixel(p) {
   // const x0 = (p.lng - boxOriginX) / pixelWidth;
   // const y0 = (p.lat - boxOriginY) / pixelWidth;
 
-  // load the geoTif tile into memory
   const fname = getFileName(tileOriginLng, tileOriginLat);
   
   return {px, py, fname}
