@@ -6,23 +6,43 @@ const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/g
 
 // define global variables 
 // TODO: find a way to manage without global variables
-let cache = {};
-let database = {};
+let CACHE = {
+  pixels: {},
+  images: {}
+};
 
-app.post('/ts-elevs-api/', (req, res) => {
+// const MAX_DATA_POINTS = 2000;
 
-  // reset cache and db
-  cache = {};     // stores retrieved images
-  database = {};  // stores elevations for retrieved pixels
+app.post('/elevations/', (req, res) => {
+
+  // reset CACHE
+  CACHE.pixels = {}; // read/write in function readPixels()
+  CACHE.images = {}; // read/write in function getImages()
+
+  let options = req.body.options;
+  if (!options) {
+    options = {
+      interpolate: false,
+      writeResultsToFile: false
+    }
+  }
+
+  let points = req.body.coordsArray;
+  // TODO: check payload size and send a readable response
+  // if (points.length > MAX_DATA_POINTS) {
+  //   res.status(400).json( "Data points limited to a maximumum of " + MAX_DATA_POINTS )
+  // }
   
   // promise chain running each point sequentially and returning the result as an array
-  req.body.coordsArray.reduce( (promise, point) => {
+  points.reduce( (promise, point) => {
     return promise.then( (allResults) => 
-      getElevation(point).then( thisResult => 
+      getElevation(point, options.interpolate).then( thisResult => 
         [...allResults, thisResult]
       ));
-  }, Promise.resolve([])).then( result => 
-    res.status(200).json( {result} )
+  }, Promise.resolve([])).then( result => { 
+    res.status(200).json( {result} );
+    if (options.writeResultsToFile) { writeResultsToFile(result, options); }
+    }
   );
 
 });
@@ -33,34 +53,36 @@ app.post('/ts-elevs-api/', (req, res) => {
  * @param {*} point desired point as {lat: number, lng: number}
  */
 
-function getElevation(point) {
+function getElevation(point, booInterp) {
 
   return new Promise( (res, rej) => { 
-    const pixel = getPixel(point);
+
+    const pixel = getPixelPosition(point, booInterp);
     const id = pixel.px.toString() + pixel.py.toString() + pixel.fname; 
 
     // if elevation for the required pixel and image exist in the database, then return that
-    if (id in database) { 
-      res( {lat: point.lat, lng: point.lng, elev: database[id]} ) 
+    // if (id in database) { 
+    //   res( {lat: point.lat, lng: point.lng, elev: database[id]} ) 
     
     // otherwise get the required elevation and store in the db in case needed in the future
-    } else {
+    // } else {\
+
       getImage(pixel.fname).then( (image) => {
-        readPixelValue(image, pixel.px, pixel.py).then( (elev) => {
-          database[id] = elev;
-          res({lat: point.lat, lng: point.lng, elev: elev});
+        readPixels(image, pixel.px, pixel.py, id, booInterp).then( (rawElevs) => {
+          const elev = booInterp ? biLinearInterp( pixel.x0, pixel.y0, rawElevs[0]) : rawElevs[0][0];
+          res({lat: point.lat, lng: point.lng, elev: Math.round(elev * 10)/10});
         })
       })
-    }
+    // }
   })
 }
-
 
 /**
  * Return fileName and .tiff pixel coordinates for desired lng/lat coordinate pair
  * @param {*} p desired point as {lat: number, lng: number}
+ * @param interp boolean: true if interpolation is required
  */
-function getPixel(p) {
+function getPixelPosition(p, interp) {
 
   const numberOfPixelsPerDegree = 3600;
   const pixelWidth = 1 / numberOfPixelsPerDegree;
@@ -82,26 +104,30 @@ function getPixel(p) {
   let dLng = p.lng - tiffOriginLng;
   let dLat = tiffOriginLat - p.lat;
 
-  // if (opt.interp) {
-  //   dLng = dLng - offset;
-  //   dLat = dLat - offset; 
-  // }
+  if (interp) {
+    dLng = dLng - offset;
+    dLat = dLat - offset; 
+  }
 
   // convert to pixel x and y coordinates
   // this is the coordinate of the upper left pixel in the group of four 
   const px = Math.trunc(dLng/pixelWidth);
   const py = Math.trunc(dLat/pixelWidth);
 
-  // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
-  // const boxOriginX = pixelX * pixelWidth + tileOriginLng;
-  // const boxOriginY = 1 - pixelY * pixelWidth + tileOriginLat;
-  // const x0 = (p.lng - boxOriginX) / pixelWidth;
-  // const y0 = (p.lat - boxOriginY) / pixelWidth;
-
-  // load the geoTif tile into memory
+  // get the filename for corresponding tile
   const fname = getFileName(tileOriginLng, tileOriginLat);
-  
-  return {px, py, fname}
+  let result = {px, py, fname}
+
+  // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
+  if (interp) {
+    const boxOriginX = px * pixelWidth + tileOriginLng;
+    const boxOriginY = 1 - py * pixelWidth + tileOriginLat;
+    const x0 = (p.lng - boxOriginX) / pixelWidth;
+    const y0 = (boxOriginY- p.lat) / pixelWidth;
+    result = {...result, x0, y0}
+  }
+
+  return result
 
 }
 
@@ -126,7 +152,7 @@ function getFileName(originLng, originLat) {
 
 
 /**
- * returns a GeoTiff image object, first checking cache - if it exists in cache then recall it, otherwise 
+ * returns a GeoTiff image object, first checking CACHE - if it exists in CACHE then recall it, otherwise 
  * open from the desired file
  * @param {*} fn filename of desired image
  */
@@ -134,15 +160,16 @@ function getImage(fn) {
 
   return new Promise( (rs, rj) => {
 
-    // if image is in the cache, the return this image
-    if (fn in cache) { 
-      rs(cache[fn]);
+    // if image is in the CACHE, the return this image
+    
+    if (fn in CACHE.images) { 
+      rs( CACHE.images[fn] );
 
-    // otherwise, load a new image from file (and store it in the cache)
+    // otherwise, load a new image from file (and store it in the CACHE)
     } else {
       GeoTIFF.fromFile('./tiff/' + fn).then( (tiff) => {
         tiff.getImage().then( (img) => {
-          cache[fn] = img;
+          CACHE.images[fn] = img;
           rs(img);
         })
       });
@@ -151,20 +178,52 @@ function getImage(fn) {
 }
 
 
+
+// /**
+//  * Returns the int16 value of the pixel defined at position (px, py) for tiff image img
+//  * @param {*} img GeoTIFF image object of the desired tile
+//  * @param {*} px pixel px coordinate in tiff coordinate frame
+//  * @param {*} py pixel py coordinate in tiff coordinate frame
+//  */
+// function readPixelValue(img, px, py) {
+
+//   return new Promise( (rs, rj) => {
+
+    
+//     const shift = 1;
+//     img.readRasters({ window: [px, py, px + shift, py + shift] }).then( (result) => { 
+//       rs(result[0][0]) 
+//     });
+//   })
+
+// }
+
 /**
  * Returns the int16 value of the pixel defined at position (px, py) for tiff image img
  * @param {*} img GeoTIFF image object of the desired tile
- * @param {*} x pixel x coordinate in tifff corrdinate frame
- * @param {*} y pixel y coordinate in tifff corrdinate frame
+ * @param {*} px pixel px coordinate in tifff corrdinate frame
+ * @param {*} py pixel py coordinate in tifff corrdinate frame
+ * @param {*} id unique id for pixel and image
+ * @param {*} boo boolean flag indicating whether interpolation is required
  */
+function readPixels(img, px, py, id, boo) {
 
-function readPixelValue(img, x, y) {
+  return new Promise( (rs, rj) => {
 
-  return new Promise((rs, rj) => {
-    const shift = 1;
-    img.readRasters({ window: [x, y, x + shift, y + shift] }).then( (result) => { 
-      rs(result[0][0]) 
-    });
+    // check if we have the required data in the CACHE already; if not load it
+    if (id in CACHE.pixels) { 
+      promise = Promise.resolve( CACHE.pixels[id] )
+    } else {
+      const shift = boo ? 2 : 1;
+      promise = img.readRasters({ window: [px, py, px + shift, py + shift] });
+    }
+
+    // when thats done, save result to CACHE if needed and return result
+    promise.then( (result) => {
+      CACHE.pixels[id] = result;
+      rs(result); 
+    })
+
   })
 
 }
@@ -174,19 +233,60 @@ function readPixelValue(img, x, y) {
  * Bilinear interpolation for elevation given 4 adjacent elevations
  * https://en.wikipedia.org/wiki/Bilinear_interpolation
  * Note that this works only for this application, the eqns have been simplified
- * @param {*} x0 defining position of poi as ratio of the width of the pixel
- * @param {*} y0 defining position of poi as ratio of the width of the pixel
- * @param {*} Q 2x2 matrix defining elevations in the 4 corners of the box
+ * @param {*} x0 defining x position of poi as ratio of the width of the pixel
+ * @param {*} y0 defining y position of poi as ratio of the width of the pixel
+ *               NOTE that the origin of the box is the upper left corner
+ * @param {*} Q 4x1 matrix defining elevations in the 4 corners of the box 
+ *             (in the order: [top-left, top-right, bottom-left, bottom-right] )
+ * pixels are ordered top-left, top-right, bottom-left, bottom-right
+ * Q11 = bottom left = top left = Q[0]
+ * Q21 = bottom right = top right = Q[1]
+ * Q12 = top left = bottom left = Q[2]
+ * Q22 = top right = bottom right = Q[3]
  */
-// function biLinearInterp(x0, y0, Q) {
+function biLinearInterp(x0, y0, Q) {
+  // console.log(x0, y0, Q);
 
-//   return ( Q[0][0] * (1 - x0) * (1 - y0) + 
-//            Q[1][0] * x0 * (1 - y0) +
-//            Q[0][1] * y0 * (1 - x0) +
-//            Q[1][1] * x0 * y0 );
+  return ( Q[0] * (1 - x0) * (1 - y0) + 
+           Q[1] * x0 * (1 - y0) +
+           Q[2] * y0 * (1 - x0) +
+           Q[3] * x0 * y0 );
 
-// }
+}
 
+/**
+ * export data to CSV
+ * @param {} data
+ */
+function writeResultsToFile(data, opts) {
 
+  const fs = require('fs');
+  let file = fs.createWriteStream("./results/results.out");
+
+  file.write(timeStamp() + '\n');
+  file.write(JSON.stringify(opts) + '\n');
+  data.forEach( (line) => {
+    file.write([line.lng, line.lat, line.elev].join(',') + '\n')
+  })
+
+}
+
+/**
+ * Generates a readble timestamp for debugging/optimisation
+ */
+function timeStamp() {
+
+  var now = new Date();
+  var ms = String(now.getMilliseconds()).padStart(2,'0')
+  var s = String(now.getSeconds()).padStart(2,'0')
+  var m = String(now.getMinutes()).padStart(2,'0')
+  var h = String(now.getHours()).padStart(2,'0')
+  var dd = String(now.getDate()).padStart(2, '0');
+  var mm = String(now.getMonth() + 1).padStart(2, '0'); //January is 0!
+  var yyyy = now.getFullYear();
+
+  return dd+'/'+mm+'/'+yyyy+' '+h+':'+m+':'+s+':'+ms;
+
+}
 
 module.exports = app;
