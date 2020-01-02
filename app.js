@@ -23,6 +23,9 @@ app.use( (req, res, next) => {
 });
 
 
+/**
+ * Get elevations from ASTGTM_v3 data downloaded from https://lpdaac.usgs.gov/products/astgtmv003/
+ */ 
 app.post('/elevations/', (req, res) => {
 
   // reset CACHE
@@ -64,13 +67,6 @@ function getElevation(point, booInterp) {
 
     const pixel = getPixelPosition(point, booInterp);
     const id = pixel.px.toString() + pixel.py.toString() + pixel.fname; 
-
-    // if elevation for the required pixel and image exist in the database, then return that
-    // if (id in database) { 
-    //   res( {lat: point.lat, lng: point.lng, elev: database[id]} ) 
-    
-    // otherwise get the required elevation and store in the db in case needed in the future
-    // } else {\
 
       getImage(pixel.fname).then( (image) => {
         readPixels(image, pixel.px, pixel.py, id, booInterp).then( (rawElevs) => {
