@@ -1,17 +1,27 @@
 const express = require('express');
 const app = express();
-const bodyParser = require('body-parser');
-app.use(bodyParser.json());
 const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/geotiff.js/
 
-// define global variables 
+// Global variables
 // TODO: find a way to manage without global variables
+const MAX_DATA_POINTS = 2000;
 let CACHE = {
   pixels: {},
   images: {}
 };
 
-// const MAX_DATA_POINTS = 2000;
+// Initiate body parser and check size of incoming data
+const bodyParser = require('body-parser');
+app.use(bodyParser.json());
+app.use( (req, res, next) => {
+  // Check size of POST body - limit to MAX_DATA_POINTS number of rows
+  if (req.body.coordsArray.length > MAX_DATA_POINTS) {
+    res.status(413).json( "POST request limit exceeded (limited to " + MAX_DATA_POINTS + " points)" );
+  } else {
+      next ();
+  }
+});
+
 
 app.post('/elevations/', (req, res) => {
 
@@ -19,6 +29,7 @@ app.post('/elevations/', (req, res) => {
   CACHE.pixels = {}; // read/write in function readPixels()
   CACHE.images = {}; // read/write in function getImages()
 
+  // check options array - if it's not present then fill it in with falses
   let options = req.body.options;
   if (!options) {
     options = {
@@ -26,15 +37,9 @@ app.post('/elevations/', (req, res) => {
       writeResultsToFile: false
     }
   }
-
-  let points = req.body.coordsArray;
-  // TODO: check payload size and send a readable response
-  // if (points.length > MAX_DATA_POINTS) {
-  //   res.status(400).json( "Data points limited to a maximumum of " + MAX_DATA_POINTS )
-  // }
   
   // promise chain running each point sequentially and returning the result as an array
-  points.reduce( (promise, point) => {
+  req.body.coordsArray.reduce( (promise, point) => {
     return promise.then( (allResults) => 
       getElevation(point, options.interpolate).then( thisResult => 
         [...allResults, thisResult]
@@ -273,6 +278,7 @@ function writeResultsToFile(data, opts) {
 
 /**
  * Generates a readble timestamp for debugging/optimisation
+ * Used when writing output file
  */
 function timeStamp() {
 
