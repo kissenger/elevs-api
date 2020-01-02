@@ -5,22 +5,22 @@ Form of request: http://server/elevations/ (where 'server' is the url of the hos
 # Post body format
 The POST data body should take the form:
 <p>
- <code>
-{ "options": <br>
-&nbsp; &nbsp; {<br>
-&nbsp; &nbsp; &nbsp; &nbsp; "interpolate": false,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; "writeResultsToFile": true <br>
-&nbsp; &nbsp; },<br>
-&nbsp; &nbsp; "coordsArray": <br>
-&nbsp; &nbsp; &nbsp; &nbsp; [<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {"lat":51.40462,"lng":-2.30217},<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {"lat":51.4046,"lng":-2.30218},<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {"lat":51.40459,"lng":-2.30219},<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {"lat":51.40457,"lng":-2.3022}<br>
-&nbsp; &nbsp; &nbsp; &nbsp;  ]<br>
-&nbsp; &nbsp;}<br>
+ <pre>
+{ "options": 
+  {
+    "interpolate": false,
+    "writeResultsToFile": true
+  },
+  "coordsArray":
+    [
+      {"lat":51.40462,"lng":-2.30217},
+      {"lat":51.4046,"lng":-2.30218},
+      {"lat":51.40459,"lng":-2.30219},
+      {"lat":51.40457,"lng":-2.3022}
+   ]
+  }
 }
-  </code>
+  </pre>
 <p>
 Where "options" is optional (options default to false).
 <ul>
@@ -29,32 +29,37 @@ Where "options" is optional (options default to false).
 </ul>
 
 # Results
-<p>
-{<br>
-&nbsp; &nbsp;"result": [<br>
-&nbsp; &nbsp; &nbsp; &nbsp;{<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lat": 51.40462,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lng": -2.30217,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "elev": 31<br>
-&nbsp; &nbsp; &nbsp; &nbsp;},<br>
-&nbsp; &nbsp; &nbsp; &nbsp;{<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lat": 51.4046,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lng": -2.30218,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "elev": 31<br>
-&nbsp; &nbsp; &nbsp; &nbsp;},<br>
-&nbsp; &nbsp; &nbsp; &nbsp;{<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lat": 51.40459,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lng": -2.30219,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "elev": 31<br>
-&nbsp; &nbsp; &nbsp; &nbsp;},<br>
-&nbsp; &nbsp; &nbsp; &nbsp;{<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lat": 51.40457,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "lng": -2.3022,<br>
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "elev": 30<br>
-&nbsp; &nbsp; &nbsp; &nbsp;}<br>
-&nbsp; &nbsp;]<br>
-}<br>
-<p>
+<pre>
+{
+  "result": [
+    {
+      "lat": 51.40462,
+      "lng": -2.30217,
+      "elev": 31
+    },
+    {
+      "lat": 51.4046,
+      "lng": -2.30218,
+      "elev": 31
+    },
+    {
+       "lat": 51.40459,
+       "lng": -2.30219,
+       "elev": 31
+     },
+     {
+       "lat": 51.40457,
+       "lng": -2.3022,
+       "elev": 30
+     },
+     {
+       "lat": 51.40457,
+       "lng": -2.3022,
+       "elev": 30
+     }
+  ]
+}
+</pre>
 
 # Useful links
 <ul>
