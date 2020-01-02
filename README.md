@@ -24,8 +24,8 @@ The POST data body should take the form:
 <p>
 Where "options" is optional (options default to false).
 <ul>
-  <li>set interpolate = true if it is desired to interpolate (see note below)</li>
-  <li>set writeResultsToFile = true if it is desired to save a datafile with the results ('./results/result.out')</li>
+  <li>set <code>interpolate = true</code> if it is desired to interpolate (see note below)</li>
+  <li>set <code>writeResultsToFile = true</code> if it is desired to save a datafile with the results ('./results/result.out')</li>
 </ul>
 
 # Results
