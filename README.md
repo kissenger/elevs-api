@@ -4,19 +4,20 @@ Node api to return elevations for given lng/lat coordinates using the NASA/METI 
 Form of request: http://server/elevations/ (where 'server' is the url of the hosted server)
 # Post body format
 The POST data body should take the form:
-{ "options": 
-  {
-  "interpolate": false,
-	"writeResultsToFile": true 
-  },
-  "coordsArray": 
-    [
-      {"lat":51.40462,"lng":-2.30217},
-      {"lat":51.4046,"lng":-2.30218},
-      {"lat":51.40459,"lng":-2.30219},
-      {"lat":51.40457,"lng":-2.3022}
-    ]
-}
+<br>
+{ "options": <br>
+  {<br>
+  "interpolate": false,<br>
+	"writeResultsToFile": true <br>
+  },<br>
+  "coordsArray": <br>
+    [<br>
+      {"lat":51.40462,"lng":-2.30217},<br>
+      {"lat":51.4046,"lng":-2.30218},<br>
+      {"lat":51.40459,"lng":-2.30219},<br>
+      {"lat":51.40457,"lng":-2.3022}<br>
+    ]<br>
+}<br>
 Where "options" is optional (options default to false).
 <ul>
   <li>set interpolate = true if it is desired to interpolate (see note below)</li>
