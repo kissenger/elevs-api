@@ -5,6 +5,7 @@ Form of request: http://server/elevations/ (where 'server' is the url of the hos
 # Post body format
 The POST data body should take the form:
 <p>
+ <code>
 { "options": <br>
 &nbsp; &nbsp; {<br>
 &nbsp; &nbsp; &nbsp; &nbsp; "interpolate": false,<br>
@@ -19,6 +20,7 @@ The POST data body should take the form:
 &nbsp; &nbsp; &nbsp; &nbsp;  ]<br>
 &nbsp; &nbsp;}<br>
 }
+  </code>
 <p>
 Where "options" is optional (options default to false).
 <ul>
