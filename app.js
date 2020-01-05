@@ -11,6 +11,7 @@ const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/g
 
 // Global variables
 // TODO: find a way to manage without global variables
+const TIFF_PATH = '../../__TIFF/';
 const MAX_DATA_POINTS = 2000;
 let CACHE = {
   pixels: {},
@@ -200,7 +201,7 @@ function getImage(fn) {
 
     // otherwise, load a new image from file (and store it in the CACHE)
     } else {
-      GeoTIFF.fromFile('./tiff/' + fn).then( (tiff) => {
+      GeoTIFF.fromFile(TIFF_PATH + fn).then( (tiff) => {
         tiff.getImage().then( (img) => {
           CACHE.images[fn] = img;
           rs(img);
