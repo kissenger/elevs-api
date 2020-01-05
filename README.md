@@ -1,4 +1,4 @@
-# elevs-api
+# ups-and-downs API
 Node api to return elevations for given lng/lat coordinates using the NASA/METI ASTGTM003 dataset.
 # Dependencies
 <ul>
@@ -6,7 +6,7 @@ Node api to return elevations for given lng/lat coordinates using the NASA/METI 
 </ul> 
 
 # Request Format
-Form of request: http://server/elevations/ (where 'server' is the url of the hosted server)
+Form of request: http://server/ups-and-downs/v1/ (where 'server' is the url of the hosted server)
 # Post body format
 The POST data body should take the form:
 <p>
