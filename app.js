@@ -1,4 +1,11 @@
-const express = require('express');
+/**
+ * upsAndDowns API v1
+ * Gets elevations from ASTGTM_v3 data downloaded from https://lpdaac.usgs.gov/products/astgtmv003/ Dec 2019
+ * Resolution is 1 arc second, which is 30m
+ * For local dev run server using 'nodemon server.js'
+ */ 
+
+ const express = require('express');
 const app = express();
 const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/geotiff.js/
 
@@ -35,11 +42,7 @@ app.use( (req, res, next) => {
 //   }
 // });
 
-
-/**
- * Get elevations from ASTGTM_v3 data downloaded from https://lpdaac.usgs.gov/products/astgtmv003/
- */ 
-app.post('/elevations/', (req, res) => { 
+app.post('/ups-and-downs/v1/', (req, res) => { 
 
   // reset CACHE
   CACHE.pixels = {}; // read/write in function readPixels()
@@ -54,20 +57,36 @@ app.post('/elevations/', (req, res) => {
     }
   }
 
-  // promise chain running each point sequentially and returning the result as an array
-  req.body.coordsArray.reduce( (promise, point) => {
-    return promise.then( (allResults) => 
-      getElevation(point, options.interpolate).then( thisResult => 
-        [...allResults, thisResult]
-      ));
-  }, Promise.resolve([])).then( result => { 
+  // this is where the work gets donw
+  upsAndDowns(req.body.coordsArray, options).then( result => {
     res.status(200).json( {result} );
-    console.log(result);
-    if (options.writeResultsToFile) { writeResultsToFile(result, options); }
-  });
-
+  })
+  
 });
 
+/**
+ * 
+ * @param {*} points array of coordinates as [{lat: number, lng: number}, {lat: ...}, .... ]
+ * @param {*} options options array
+ */
+function upsAndDowns(points, options) {
+
+  return new Promise( (resolve, reject) => {
+
+    // promise chain running each point sequentially and returning the result as an array
+    points.reduce( (promise, point) => {
+      return promise.then( (allResults) => 
+        getElevation(point, options.interpolate).then( thisResult => 
+          [...allResults, thisResult]
+        ));
+    }, Promise.resolve([])).then( result => {
+      if (options.writeResultsToFile) { writeResultsToFile(result, options); } 
+      resolve(result);
+    });
+
+  });
+
+}
 
 /**
  * returns the elevation for desired lng/lat coordinate pair
