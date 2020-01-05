@@ -1,5 +1,10 @@
 # elevs-api
 Node api to return elevations for given lng/lat coordinates using the NASA/METI ASTGTM003 dataset.
+# Dependencies
+<ul>
+  <li> <a href="https://geotiffjs.github.io/geotiff.js/">GeoTiff library</a> npm i geotiff </li>
+</ul> 
+
 # Request Format
 Form of request: http://server/elevations/ (where 'server' is the url of the hosted server)
 # Post body format
