@@ -1,7 +1,7 @@
 
 const express = require('express');
 const app = express();
-const upsAndDowns = require('./ups-and-downs_v2').upsAndDowns;
+const upsAndDowns = require('./ups-and-downs_v3').upsAndDowns;
 
 // // Initiate body parser to interprete post requests
 const bodyParser = require('body-parser');

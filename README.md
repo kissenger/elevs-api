@@ -1,12 +1,15 @@
 # ups-and-downs API
 Node api to return elevations for given lng/lat coordinates using the NASA/METI ASTGTM003 dataset.
+Latest version v3 is a significant refactor and much improved performance.
+
 # Dependencies
 <ul>
   <li> <a href="https://geotiffjs.github.io/geotiff.js/">GeoTiff library</a> npm i geotiff </li>
 </ul> 
 
 # Request Format
-Form of request: http://server/ups-and-downs/v1/ (where 'server' is the url of the hosted server)
+Form of request: http://server/ups-and-downs/ (where 'server' is the url of the hosted server)
+
 # Post body format
 The POST data body should take the form:
 <p>
@@ -29,7 +32,7 @@ The POST data body should take the form:
 <p>
 Where "options" is optional (options default to false).
 <ul>
-  <li>set <code>interpolate = true</code> if it is desired to interpolate (see note below)</li>
+  <li>set <code>interpolate = true</code> if it is desired to interpolate (see note below) NOTE NOT YET SUPPORTED IN v3</li>
   <li>set <code>writeResultsToFile = true</code> if it is desired to save a datafile with the results ('./results/result.out')</li>
 </ul>
 

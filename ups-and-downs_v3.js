@@ -11,6 +11,7 @@
  * ------------------------------------------------
  * Changes at v3
  * almost complete re-factor with new strategy
+ * options argument removed, bilin interp function removed (still in v2 if needed)
  */ 
 
 const TIFF_PATH = '../../__TIFF/';
@@ -20,9 +21,8 @@ const GeoTIFF = require('geotiff');             // https://geotiffjs.github.io/g
 /**
  * 
  * @param {*} points array of coordinates as [{lat: number, lng: number}, {lat: ...}, .... ]
- * @param {*} options options array
  */
-function upsAndDowns(points, options) {
+function upsAndDowns(points) {
 
   return new Promise( (resolve, reject) => {
     const imageMap = preProcessPoints(points);
@@ -58,8 +58,6 @@ function preProcessPoints(points) {
 
   return images;
 }
-
-
 
 /**
  * Class to keep track of pixels associated with each required image
@@ -146,7 +144,6 @@ function getElevations(points, imageAssocArr) {
     
 }
 
-
 /**
  * Return fileName and .tiff pixel coordinates for desired lng/lat coordinate pair
  * Unchanged at v3
@@ -177,11 +174,6 @@ function getPixelPosition(p, interp) {
   let dLng = p.lng - tiffOriginLng;
   let dLat = tiffOriginLat - p.lat;
 
-  // if (interp) {
-  //   dLng = dLng - offset;
-  //   dLat = dLat - offset; 
-  // }
-
   // convert to pixel x and y coordinates
   // this is the coordinate of the upper left pixel in the group of four 
   const px = Math.trunc(dLng/pixelWidth);
@@ -189,15 +181,6 @@ function getPixelPosition(p, interp) {
 
   // get the filename for corresponding tile
   let result = {px, py, fname: getFileName(tileOriginLng, tileOriginLat)};
-
-  // now need to find where the poi is in the box of 4 pixels, relative to a line through their centres
-  // if (interp) {
-  //   const boxOriginX = px * pixelWidth + tileOriginLng;
-  //   const boxOriginY = 1 - py * pixelWidth + tileOriginLat;
-  //   const x0 = (p.lng - boxOriginX) / pixelWidth;
-  //   const y0 = (boxOriginY- p.lat) / pixelWidth;
-  //   result = {...result, x0, y0}
-  // }
 
   return result;
 
@@ -241,31 +224,6 @@ function getDataFromImage(fn, w) {
     });
   })
 }
-
-/**
- * Bilinear interpolation for elevation given 4 adjacent elevations
- * https://en.wikipedia.org/wiki/Bilinear_interpolation
- * Note that this works only for this application, the eqns have been simplified
- * @param {*} x0 defining x position of poi as ratio of the width of the pixel
- * @param {*} y0 defining y position of poi as ratio of the width of the pixel
- *               NOTE that the origin of the box is the upper left corner
- * @param {*} Q 4x1 matrix defining elevations in the 4 corners of the box 
- *             (in the order: [top-left, top-right, bottom-left, bottom-right] )
- * pixels are ordered top-left, top-right, bottom-left, bottom-right
- * Q11 = bottom left = top left = Q[0]
- * Q21 = bottom right = top right = Q[1]
- * Q12 = top left = bottom left = Q[2]
- * Q22 = top right = bottom right = Q[3]
- */
-// function biLinearInterp(x0, y0, Q) {
-//   // console.log(x0, y0, Q);
-
-//   return ( Q[0] * (1 - x0) * (1 - y0) + 
-//            Q[1] * x0 * (1 - y0) +
-//            Q[2] * y0 * (1 - x0) +
-//            Q[3] * x0 * y0 );
-
-// }
 
 module.exports = {
   upsAndDowns 
